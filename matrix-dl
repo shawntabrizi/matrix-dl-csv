@@ -1,0 +1,151 @@
+#!/usr/bin/python3
+import argparse
+import datetime
+import sys
+import re
+import getpass
+import json
+
+from matrix_client.client import MatrixClient
+
+
+class Colors:
+    plat = sys.platform
+    supported_platform = plat != 'Pocket PC' and (plat != 'win32' or
+                                                  'ANSICON' in os.environ)
+    # isatty is not always implemented, #6223.
+    is_a_tty = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+    if not supported_platform or not is_a_tty:
+        HEADER = ''
+        OKBLUE = ''
+        OKGREEN = ''
+        WARNING = ''
+        FAIL = ''
+        ENDC = ''
+    else:
+        HEADER = '\033[95m'
+        OKBLUE = '\033[94m'
+        OKGREEN = '\033[92m'
+        WARNING = '\033[93m'
+        FAIL = '\033[91m'
+        ENDC = '\033[0m'
+    force_disable = False
+
+    @classmethod
+    def disable(cls):
+        cls.HEADER = ''
+        cls.OKBLUE = ''
+        cls.OKGREEN = ''
+        cls.WARNING = ''
+        cls.FAIL = ''
+        cls.ENDC = ''
+
+    @classmethod
+    def enable(cls):
+        if cls.force_disable:
+            return
+
+        cls.HEADER = '\033[95m'
+        cls.OKBLUE = '\033[94m'
+        cls.OKGREEN = '\033[92m'
+        cls.WARNING = '\033[93m'
+        cls.FAIL = '\033[91m'
+        cls.ENDC = '\033[0m'
+
+
+class MatrixLogGetter:
+    def __init__(self):
+        self.matrix_url = "https://matrix.igalia.com"
+        self.username = None
+        self.password = None
+        self.room = None
+        self.client = None
+        self.start_date = "01012017"
+        self.messages = []
+
+    def run(self):
+        self.client = MatrixClient(self.matrix_url)
+
+        self.username, = self.username
+        self.room, = self.room
+        self.start_date = datetime.datetime.strptime(
+            self.start_date, '%d%m%Y').date()
+
+        if not self.password:
+            self.password = getpass.getpass()
+
+        print(self.username, "connecting to", self.matrix_url, file=sys.stderr)
+        token = self.client.login_with_password(username=self.username,
+                                                password=self.password)
+
+        room = None
+        rooms = self.client.get_rooms()
+        for tmproom in rooms.values():
+            if tmproom.name == self.room:
+                room = tmproom
+                break
+        if not room:
+            print("Could not find room %s" % room, file=sys.stderr)
+            sys.exit(1)
+
+        try:
+            self.download(room)
+        finally:
+            self.print_messages()
+
+    def download(self, room):
+        token = room.prev_batch
+        while True:
+            res = self.client.api.get_room_messages(
+                room.room_id, token, 'b', limit=10000)
+            token = res['end']
+            for event in res['chunk']:
+                if event['type'] == 'm.room.message':
+                    self.messages.insert(0, event)
+            ts = self.messages[0]['origin_server_ts'] / 1000
+            date = datetime.datetime.fromtimestamp(ts).date()
+            print("Getting messages before %s" % (date), file=sys.stderr)
+            if date < self.start_date:
+                return
+
+    def print_messages(self):
+        cday = None
+        print("Got %s" % len(self.messages), file=sys.stderr)
+        for message in self.messages:
+            if message['type'] == 'm.room.message':
+                ts = message['origin_server_ts'] / 1000
+
+                date = datetime.datetime.fromtimestamp(ts).date()
+                if date < self.start_date:
+                    continue
+
+                day = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y')
+                if day != cday:
+                    cday = day
+                    print("==== %s%s%s ====" %
+                          (Colors.HEADER, day, Colors.ENDC))
+                time = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
+
+                try:
+                    # IRC users
+                    user = re.findall(r'_(.*?):', message['sender'])[0]
+                except IndexError:
+                    # Matrix users
+                    user = re.findall(r'(.*?):', message['sender'])[0]
+                print("%s — %s: %s" % (time, user, message['content']['body']))
+
+
+if __name__ == "__main__":
+    getter = MatrixLogGetter()
+
+    parser = argparse.ArgumentParser(description='Download backlogs from Matrix'
+                                     ' as raw test')
+    parser.add_argument('username', nargs=1, type=str)
+    parser.add_argument('room', nargs=1, type=str)
+    parser.add_argument('--password', type=str, default=None,
+                        help="Will be asked later if not provided")
+    parser.add_argument('--matrix-url', default=getter.matrix_url)
+    parser.add_argument('--start-date', default="01012017")
+
+    options = parser.parse_args(namespace=getter)
+    getter.run()
