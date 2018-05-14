@@ -85,7 +85,7 @@ class MatrixLogGetter:
                 room = tmproom
                 break
         if not room:
-            print("Could not find room %s" % room, file=sys.stderr)
+            print("Could not find room %s" % self.room, file=sys.stderr)
             sys.exit(1)
 
         try:
