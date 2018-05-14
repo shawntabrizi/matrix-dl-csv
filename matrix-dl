@@ -145,7 +145,8 @@ if __name__ == "__main__":
     parser.add_argument('--password', type=str, default=None,
                         help="Will be asked later if not provided")
     parser.add_argument('--matrix-url', default=getter.matrix_url)
-    parser.add_argument('--start-date', default="01012017")
+    parser.add_argument('--start-date', default="01012017",
+                        help='format %%d%%m%%Y')
 
     options = parser.parse_args(namespace=getter)
     getter.run()
