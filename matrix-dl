@@ -102,9 +102,13 @@ class MatrixLogGetter:
             res = self.client.api.get_room_messages(
                 room.room_id, token, 'b', limit=10000)
             token = res['end']
+            count = 0
             for event in res['chunk']:
+                count += 1
                 if event['type'] == 'm.room.message':
                     self.messages.insert(0, event)
+            if count == 0:
+                return
             ts = self.messages[0]['origin_server_ts'] / 1000
             date = datetime.datetime.fromtimestamp(ts).date()
             print("Getting messages before %s" % (date), file=sys.stderr)
