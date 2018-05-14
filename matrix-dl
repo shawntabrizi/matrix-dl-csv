@@ -80,10 +80,13 @@ class MatrixLogGetter:
 
         room = None
         rooms = self.client.get_rooms()
-        for tmproom in rooms.values():
-            if tmproom.name == self.room:
-                room = tmproom
-                break
+        try:
+            room = rooms[self.room]
+        except KeyError:
+            for tmproom in rooms.values():
+                if tmproom.name == self.room:
+                    room = tmproom
+                    break
         if not room:
             print("Could not find room %s" % self.room, file=sys.stderr)
             sys.exit(1)
