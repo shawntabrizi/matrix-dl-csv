@@ -132,8 +132,12 @@ class MatrixLogGetter:
                 except IndexError:
                     # Matrix users
                     user = re.findall(r'(.*?):', message['sender'])[0]
-                print("%s — %s: %s" % (time, user, message['content']['body']))
 
+                try:
+                    content = message['content']['body']
+                except:
+                    content = ''
+                print("%s — %s: %s" % (time, user, content))
 
 if __name__ == "__main__":
     getter = MatrixLogGetter()
