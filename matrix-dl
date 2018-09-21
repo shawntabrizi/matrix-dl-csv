@@ -10,6 +10,7 @@ import json
 
 from matrix_client.client import MatrixClient
 
+DATE_FORMAT = '%d%m%Y'
 
 class Colors:
     plat = sys.platform
@@ -63,6 +64,7 @@ class MatrixLogGetter:
         self.room = None
         self.client = None
         self.start_date = "01012017"
+        self.end_date = None
         self.messages = []
 
     def run(self):
@@ -71,7 +73,10 @@ class MatrixLogGetter:
         self.username, = self.username
         self.room, = self.room
         self.start_date = datetime.datetime.strptime(
-            self.start_date, '%d%m%Y').date()
+            self.start_date, DATE_FORMAT).date()
+        if self.end_date:
+            self.end_date = datetime.datetime.strptime(
+                self.end_date, DATE_FORMAT).date()
 
         if not self.password:
             self.password = getpass.getpass()
@@ -125,7 +130,8 @@ class MatrixLogGetter:
                 ts = message['origin_server_ts'] / 1000
 
                 date = datetime.datetime.fromtimestamp(ts).date()
-                if date < self.start_date:
+                if date < self.start_date or \
+                        (self.end_date and date > self.end_date):
                     continue
 
                 day = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y')
@@ -158,9 +164,14 @@ if __name__ == "__main__":
     parser.add_argument('--password', type=str, default=None,
                         help="Will be asked later if not provided via this "
                              "option or MATRIX_PASSWORD environment variable")
-    parser.add_argument('--matrix-url', default=getter.matrix_url)
+    parser.add_argument('--matrix-url', default=getter.matrix_url,
+                        help="[default: %(default)s]")
+    DATE_FORMAT_STR = '(format %s) [default: %%(default)s]' \
+                      % DATE_FORMAT.replace('%', '%%')
     parser.add_argument('--start-date', default="01012017",
-                        help='format %%d%%m%%Y')
+                        help='Starting day to consider %s' % DATE_FORMAT_STR)
+    parser.add_argument('--end-date', default=None,
+                        help='Last day to consider %s' % DATE_FORMAT_STR)
 
     options = parser.parse_args(namespace=getter)
     getter.run()
