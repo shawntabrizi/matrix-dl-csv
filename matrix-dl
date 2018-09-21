@@ -3,6 +3,7 @@ import os
 import argparse
 import datetime
 import sys
+import os
 import re
 import getpass
 import json
@@ -58,7 +59,7 @@ class MatrixLogGetter:
     def __init__(self):
         self.matrix_url = "https://matrix.igalia.com"
         self.username = None
-        self.password = None
+        self.password = os.environ.get('MATRIX_PASSWORD', None)
         self.room = None
         self.client = None
         self.start_date = "01012017"
@@ -155,7 +156,8 @@ if __name__ == "__main__":
     parser.add_argument('username', nargs=1, type=str)
     parser.add_argument('room', nargs=1, type=str)
     parser.add_argument('--password', type=str, default=None,
-                        help="Will be asked later if not provided")
+                        help="Will be asked later if not provided via this "
+                             "option or MATRIX_PASSWORD environment variable")
     parser.add_argument('--matrix-url', default=getter.matrix_url)
     parser.add_argument('--start-date', default="01012017",
                         help='format %%d%%m%%Y')
