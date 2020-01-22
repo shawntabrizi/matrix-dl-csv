@@ -25,5 +25,5 @@ python3 setup.py install
 Example: (with username `shawntabrizi`)
 
 ```
-matrix-dl --matrix-url https://matrix.parity.io --start-date 01012016 shawntabrizi "Substrate Technical"
+matrix-dl --matrix-url https://matrix.parity.io --start-date 01012016 shawntabrizi "Substrate Technical (Public)"
 ```

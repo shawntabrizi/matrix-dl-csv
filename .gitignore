@@ -1,3 +1,6 @@
 .vscode
 output.csv
 .Python
+build
+dist
+matrix_dl.egg-info
