@@ -158,7 +158,6 @@ class MatrixLogGetter:
                         content = ''
                     writer.writerow({'date': day, 'time': time, 'user': user, 'message': content})
 
-
 if __name__ == "__main__":
     getter = MatrixLogGetter()
 
