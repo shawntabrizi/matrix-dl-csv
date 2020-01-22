@@ -1,13 +1,17 @@
 #!/usr/bin/python3
+import os
 import argparse
 import datetime
 import sys
+import os
 import re
 import getpass
 import json
+import csv
 
 from matrix_client.client import MatrixClient
 
+DATE_FORMAT = '%d%m%Y'
 
 class Colors:
     plat = sys.platform
@@ -57,10 +61,11 @@ class MatrixLogGetter:
     def __init__(self):
         self.matrix_url = "https://matrix.igalia.com"
         self.username = None
-        self.password = None
+        self.password = os.environ.get('MATRIX_PASSWORD', None)
         self.room = None
         self.client = None
         self.start_date = "01012017"
+        self.end_date = None
         self.messages = []
 
     def run(self):
@@ -69,7 +74,10 @@ class MatrixLogGetter:
         self.username, = self.username
         self.room, = self.room
         self.start_date = datetime.datetime.strptime(
-            self.start_date, '%d%m%Y').date()
+            self.start_date, DATE_FORMAT).date()
+        if self.end_date:
+            self.end_date = datetime.datetime.strptime(
+                self.end_date, DATE_FORMAT).date()
 
         if not self.password:
             self.password = getpass.getpass()
@@ -118,33 +126,38 @@ class MatrixLogGetter:
     def print_messages(self):
         cday = None
         print("Got %s" % len(self.messages), file=sys.stderr)
-        for message in self.messages:
-            if message['type'] == 'm.room.message':
-                ts = message['origin_server_ts'] / 1000
 
-                date = datetime.datetime.fromtimestamp(ts).date()
-                if date < self.start_date:
-                    continue
+        with open('output.csv', 'w', newline='') as csvfile:
+            fieldnames = ['date', 'time', 'user', 'message']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            for message in self.messages:
+                if message['type'] == 'm.room.message':
+                    ts = message['origin_server_ts'] / 1000
 
-                day = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y')
-                if day != cday:
-                    cday = day
-                    print("==== %s%s%s ====" %
-                          (Colors.HEADER, day, Colors.ENDC))
-                time = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
+                    date = datetime.datetime.fromtimestamp(ts).date()
+                    if date < self.start_date:
+                        continue
 
-                try:
-                    # IRC users
-                    user = re.findall(r'_(.*?):', message['sender'])[0]
-                except IndexError:
-                    # Matrix users
-                    user = re.findall(r'(.*?):', message['sender'])[0]
+                    day = datetime.datetime.fromtimestamp(ts).strftime('%m-%d-%Y')
+                    if day != cday:
+                        cday = day
+                        #print("==== %s%s%s ====" %
+                        #   (Colors.HEADER, day, Colors.ENDC))
+                    time = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
 
-                try:
-                    content = message['content']['body']
-                except:
-                    content = ''
-                print("%s — %s: %s" % (time, user, content))
+                    try:
+                        # IRC users
+                        user = re.findall(r'_(.*?):', message['sender'])[0]
+                    except IndexError:
+                        # Matrix users
+                        user = re.findall(r'(.*?):', message['sender'])[0]
+
+                    try:
+                        content = message['content']['body']
+                    except:
+                        content = ''
+                    writer.writerow({'date': day, 'time': time, 'user': user, 'message': content})
+
 
 if __name__ == "__main__":
     getter = MatrixLogGetter()
@@ -154,10 +167,16 @@ if __name__ == "__main__":
     parser.add_argument('username', nargs=1, type=str)
     parser.add_argument('room', nargs=1, type=str)
     parser.add_argument('--password', type=str, default=None,
-                        help="Will be asked later if not provided")
-    parser.add_argument('--matrix-url', default=getter.matrix_url)
+                        help="Will be asked later if not provided via this "
+                             "option or MATRIX_PASSWORD environment variable")
+    parser.add_argument('--matrix-url', default=getter.matrix_url,
+                        help="[default: %(default)s]")
+    DATE_FORMAT_STR = '(format %s) [default: %%(default)s]' \
+                      % DATE_FORMAT.replace('%', '%%')
     parser.add_argument('--start-date', default="01012017",
-                        help='format %%d%%m%%Y')
+                        help='Starting day to consider %s' % DATE_FORMAT_STR)
+    parser.add_argument('--end-date', default=None,
+                        help='Last day to consider %s' % DATE_FORMAT_STR)
 
     options = parser.parse_args(namespace=getter)
     getter.run()
